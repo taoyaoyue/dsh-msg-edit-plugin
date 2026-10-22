@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-msg-edit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "DSH 插件：改这一轮的提问并原地重发 / 删掉这一轮及之后的内容",

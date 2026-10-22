@@ -176,7 +176,19 @@ const childSession = {
 const archiveImpl = async (id, options) => {
   calls.log.push(`archive:${id}`)
   calls.archived.push([id, options?.stopActivity === true])
-  if (calls.failArchive === true && id === 'session-test') throw new Error('workspace/session-active')
+  if (calls.failArchive === true && id === 'session-test') {
+    const error = new Error('workspace session archive failed: workspace/session-active: session has running work')
+    error.name = 'WorkspaceArchiveError'
+    error.rpcError = {
+      code: 'workspace/session-active',
+      message: 'session has running work',
+      details: {
+        sessionId: id,
+        activity: [{ kind: 'subagent', items: [{ id: 'sub-8fdfcde2', label: '核对 03a 收尾' }] }],
+      },
+    }
+    throw error
+  }
 }
 
 const registrations = []
@@ -283,15 +295,15 @@ calls.log.length = 0
 calls.archived.length = 0
 await tailProps.ops.rewrite('session-test', 6, undefined)
 if (calls.forkedAt !== 5) throw new Error(`fork 边界错：期望 5，实际 ${calls.forkedAt}`)
-if (JSON.stringify(calls.archived[0]) !== JSON.stringify(['session-test', true])) {
-  throw new Error(`归档调用不对（要带 stopActivity）：${JSON.stringify(calls.archived)}`)
+if (JSON.stringify(calls.archived[0]) !== JSON.stringify(['session-test', false])) {
+  throw new Error(`归档旧会话时不能带 stopActivity（会杀掉正在跑的子 agent），实际：${JSON.stringify(calls.archived)}`)
 }
 if (calls.opened.at(-1) !== 'child-1') throw new Error('没有跳到新对话')
 if (!calls.log.includes('queue:q1:remove') || !calls.log.includes('queue:q2:remove')) {
   throw new Error(`继承来的排队消息没清掉：${JSON.stringify(calls.log)}`)
 }
 if (calls.log.includes('prompt')) throw new Error('删除路径不该发消息')
-if (typeof calls.parentTitle !== 'string' || !calls.parentTitle.endsWith('\u200b')) {
+if (typeof calls.parentTitle !== 'string' || !calls.parentTitle.endsWith('\u200c\u200d')) {
   throw new Error(`旧会话没打删除记号：${JSON.stringify(calls.parentTitle)}`)
 }
 // 归档必须发生在跳转之前：否则归档失败时用户已经被送到复制品里
@@ -319,10 +331,12 @@ calls.archived.length = 0
 calls.opened.length = 0
 calls.failArchive = true
 let archiveFailed = false
+let archiveMessage = ''
 try {
   await tailProps.ops.rewrite('session-test', 6, undefined)
 } catch (error) {
   archiveFailed = true
+  archiveMessage = String(error.message)
 }
 calls.failArchive = false
 if (!archiveFailed) throw new Error('归档失败时必须报错，不能静默留下复制品')
@@ -331,6 +345,12 @@ if (calls.log.includes('prompt')) throw new Error('归档失败时不该发消�
 if (!calls.archived.some((entry) => entry[0] === 'child-1')) {
   throw new Error(`归档失败后应把复制品收进归档：${JSON.stringify(calls.archived)}`)
 }
+// 归档被拒时:报出谁在跑、恢复标题、不带 stopActivity
+if (!archiveMessage.includes('子 agent')) throw new Error(`报错没说清是谁在跑：${archiveMessage}`)
+if (!archiveMessage.includes('核对 03a 收尾')) throw new Error(`报错没带上 label：${archiveMessage}`)
+if (!archiveMessage.includes('不会替你停掉')) throw new Error(`报错没表明不会强杀：${archiveMessage}`)
+if (calls.parentTitle !== '测试会话') throw new Error(`归档失败要把标题恢复回去，实际：${JSON.stringify(calls.parentTitle)}`)
+if (calls.archived[0][1] !== false) throw new Error(`归档旧会话不能带 stopActivity：${JSON.stringify(calls.archived)}`)
 
 // 9) 在跑时调用必须被挡住
 runningState = true

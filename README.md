@@ -16,6 +16,8 @@
 
 会话正在跑（含"正在思考"）时：垃圾桶不出现，铅笔禁用，避免在生成中途切分支。
 
+另外，**回合已经结束、但后台子 agent / 后台任务 / 定时提醒还在跑**时，删除和编辑也会被拒绝：插件不会替你停掉它们（旧版本会，代价是正在跑的子 agent 被一起 cancel），而是把「谁在跑」列出来让你等。
+
 ## 安装
 
 需要 DSH 桌面版已经能正常运行（本插件在 `0.2.1-rc.2` 上开发并测试）。
@@ -59,7 +61,7 @@ DSH 的会话日志 append-only、永不改写（`dsh-session-persistence`：eve
 
 1. 从日志里找到第 N 轮的 `turn/start`，边界取它前一个 seq（= 第 N-1 轮的结尾）；
 2. `fork` 出一份"到边界为止"的新会话（前缀完全相同）；
-3. 旧会话：标题末尾加一个零宽空格（U+200B）当删除记号 → 归档（优先走 `uiWorkspace.archiveSession`，它会顺带清主视图引用）；
+3. 旧会话：标题末尾加一对零宽连接符（U+200C U+200D）当删除记号 → 归档（优先走 `uiWorkspace.archiveSession`，它会顺带清主视图引用）；
 4. 新会话：标题改成和旧的一样 → 打开它 → 清掉 fork 带过来的"排队未发"消息 → （编辑时）把改过的话发出去。
 
 第 1 轮没有"上一轮结尾"可切，此时用 `sessions.create()` 开新会话，同样归档旧的。
@@ -69,7 +71,7 @@ DSH 的会话日志 append-only、永不改写（`dsh-session-persistence`：eve
 删除记号的清扫由 `index.js`（Host 半边）做，它只删**同时满足**下面条件的目录：
 
 - 会话在 `workspaceRegistry.archivedSessionIds` 里（已归档）；
-- 标题以 U+200B 结尾；
+- 标题以 U+200C U+200D 结尾；
 - 目录名与 sessionId 完全相等，且确实在 `<DSH_HOME>/sessions/<bucket>/` 下面；
 - 目录里确实有 `session.*` 日志文件。
 
@@ -84,6 +86,8 @@ DSH 的会话日志 append-only、永不改写（`dsh-session-persistence`：eve
 - **删完要重启才彻底干净**：磁盘上的会话文件 5 分钟内会被清掉，但 DSH 运行期还攥着那条会话的记录，「已归档」里可能留一个打不开的条目；重启后它就没了。
 - 依赖 DSH 内部 API（`session.fork`、`archiveSession`、插槽 `conversation.chat.turnTail` 等）。**DSH 大版本升级后可能失效**，失效表现通常是按钮不出现或点了报错，不会损坏数据。
 - 只做过 `0.2.1-rc.2` 的实测；其他版本没验证。
+
+- **有工作在跑时删不掉**：回合、后台子 agent、后台任务、定时提醒任一项在跑，归档都会被 DSH 拒绝（报错里会列出是谁在跑）。这是故意的——旧版本用 `stopActivity: true` 强行归档，会把正在跑的子 agent 一起杀掉。
 
 ## 开发与自测
 
@@ -112,6 +116,14 @@ node purge-smoke.mjs    # Host 侧：在临时 DSH_HOME 里造假会话目录，
 - 想立刻同步：GitHub 仓库 → **Actions** → 左侧「从 Gitee 镜像同步」→ **Run workflow**。
 - 用的是 Actions 自带的 `GITHUB_TOKEN`，**不需要配任何 Secret**。Gitee 仓库将来要是转私有，再到 GitHub 加 `GITEE_USER` / `GITEE_TOKEN` 两个 Secret 即可（workflow 里已经预留）。
 - **别直接在 GitHub 上改文件** —— 下一次同步会被 Gitee 的内容覆盖。
+
+## 更新记录
+
+### 1.0.1（2026-10-23）
+
+- **修掉「删/改一轮消息会把正在跑的子 agent 一起杀掉」**：归档旧会话时不再传 `stopActivity: true`。该参数在 DSH 里是「先停掉这个会话的回合、后台子 agent、后台任务和定时提醒再归档」，实测 2026-10-22 23:47:59 一次编辑把两个后台子 agent 以 `{kind:"parent"}` cancel 掉了。现在改为不带参数归档：有工作在跑时 DSH 会以 `workspace/session-active` 拒绝，插件把 activity 里的回合 / 子 agent / 后台任务 / 定时提醒列出来，等你处理完再来。
+- **修掉「删盘从来没生效」**：删除记号从 U+200B 换成 U+200C U+200D。DSH 的标题归一化会把 U+200B（以及 U+FEFF、方向控制符）从标题里删掉，记号存不进去，Host 半边的 `title.endsWith(MARK)` 永远为假，于是「删除」实际上只归档、不删盘。
+- `smoke.mjs` 新增用例：归档被拒时必须报出「谁在跑」、恢复标题、且不带 `stopActivity`。
 
 ## License
 

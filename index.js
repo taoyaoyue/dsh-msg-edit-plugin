@@ -1,7 +1,10 @@
 /**
  * Host 半边：把被「删除这段对话」替换掉的旧会话从磁盘上清掉。
  *
- * 约定：Client 先把旧会话的标题末尾加一个零宽空格（U+200B），再把它归档。
+ * 约定：Client 先把旧会话的标题末尾加一对零宽连接符（U+200C U+200D），再把它归档。
+ * 为什么不用 U+200B：DSH 的标题归一化（dsh-session-title 的 DIRECTIONAL_CONTROL）会把
+ * U+200B / U+FEFF / 方向控制符删掉，记号存不进标题，purge 就永远不会触发；
+ * U+200C / U+200D 不在那份名单里，能活下来。
  * 这里扫「已归档的会话」，标题带这个记号的才删，且只删目录名与 sessionId 完全相等的目录。
  * 另有旁证日志 <DSH_HOME>/msg-edit-purge.log，删了什么都记一行。
  */
@@ -10,7 +13,7 @@ import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const MARK = '\u200b'
+const MARK = '\u200c\u200d'
 const FIRST_SWEEP_MS = 15000
 const SWEEP_INTERVAL_MS = 5 * 60 * 1000
 

@@ -261,6 +261,29 @@ window.__ModuleLoader__.load({
         return removed
       }
 
+      /** 归档被拒时把「谁还在跑」翻成人话:回合 / 子 agent / 后台任务 / 定时提醒。 */
+      function busyReason(error) {
+        const labels = { turn: '回合', subagent: '子 agent', job: '后台任务', schedule: '定时提醒' }
+        const rpc = error !== null && typeof error === 'object' && error.rpcError !== null && typeof error.rpcError === 'object' ? error.rpcError : undefined
+        const activity = rpc !== undefined && rpc.details !== null && typeof rpc.details === 'object' && Array.isArray(rpc.details.activity) ? rpc.details.activity : []
+        if (activity.length === 0) {
+          const reason = error !== null && typeof error === 'object' && typeof error.message === 'string' ? error.message : String(error)
+          return `旧对话没能归档（${reason}）。等它彻底停下来再试一次`
+        }
+        const names = []
+        for (const family of activity) {
+          const kind = family !== null && typeof family === 'object' && typeof family.kind === 'string' ? family.kind : ''
+          const label = labels[kind] === undefined ? '工作' : labels[kind]
+          const items = family !== null && typeof family === 'object' && Array.isArray(family.items) ? family.items : []
+          for (const item of items) {
+            const name = item !== null && typeof item === 'object' && typeof item.id === 'string' ? (typeof item.label === 'string' && item.label !== '' ? item.label : item.id) : ''
+            names.push(name === '' ? label : `${label}「${name}」`)
+          }
+          if (items.length === 0) names.push(label)
+        }
+        return `旧对话里还有 ${names.join('、')} 在跑，等它们结束再试（不会替你停掉）`
+      }
+
       /** 切在 startSeq 之前另开一支，可选地把新的话发出去，然后归档旧会话。 */
       async function rewrite(sessionId, startSeq, text) {
         const session = sessionOf(sessionId)
@@ -281,7 +304,9 @@ window.__ModuleLoader__.load({
           childId = await ctx.sessions.create(cwd === undefined ? {} : { cwd })
         }
 
-        // 先把旧会话归档掉：被中断/还在收尾的会话要 stopActivity 才归档得动。
+        // 归档旧会话时绝不能带 stopActivity：那会把会话里正在跑的子 agent
+        // 一起 cancel 掉（workspace/session-stop 会 cancel 每个 running 子孙）。
+        // 不带它时，DSH 会以 workspace/session-active 拒绝，把「谁在跑」报回来。
         // 归档失败就不往下走（不跳转、不发消息），避免"删不掉却多出一份复制品"。
         const archive = archiver()
         if (archive === undefined) throw new Error('这个版本的 DSH 没有归档能力，删不了')
@@ -289,13 +314,13 @@ window.__ModuleLoader__.load({
         const canMark = typeof title === 'string' && title !== ''
         if (canMark && typeof session.rename === 'function') {
           try {
-            await session.rename(`${title}\u200b`)
+            await session.rename(`${title}\u200c\u200d`)
           } catch (error) {
             // 打不上删除记号就退化成"只归档、不删盘"
           }
         }
         try {
-          await archive(sessionId, { stopActivity: true })
+          await archive(sessionId)
         } catch (error) {
           // 恢复标题，免得以后被手动归档时误当成删除目标
           if (typeof session.rename === 'function' && typeof title === 'string' && title !== '') {
@@ -311,8 +336,7 @@ window.__ModuleLoader__.load({
           } catch (childError) {
             // 收不掉也不阻断报错
           }
-          const reason = error !== null && typeof error === 'object' && typeof error.message === 'string' ? error.message : String(error)
-          throw new Error(`没删掉：旧对话的收尾还没结束（${reason}）。等它彻底停下来再试一次`)
+          throw new Error(`没删掉：${busyReason(error)}`)
         }
 
         const workspace = ctx.get('uiWorkspace')

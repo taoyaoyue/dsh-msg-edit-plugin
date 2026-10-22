@@ -1,5 +1,5 @@
 // Host 半边（index.js）的离线自测：在临时 DSH_HOME 里造几个会话目录，验证
-// 「已归档 + 标题带零宽空格 + 里确有 session.* 日志」三条都满足才删，
+// 「已归档 + 标题带零宽连接符 + 里确有 session.* 日志」三条都满足才删，
 // 少一条都不许动。不需要 DSH 在跑。
 import { mkdir, writeFile, readFile, rm, access } from 'node:fs/promises'
 import path from 'node:path'
@@ -12,9 +12,9 @@ const cache = path.join(root, 'storages', 'session_projcache', 'sessions')
 
 /** 每个样本：id、标题、归档与否、目录里放什么、期望是否被删。 */
 const samples = [
-  { id: 'session-marked', title: '要删的会话\u200b', archived: true, files: ['session.v4.jsonl.zstd'], expectDeleted: true },
-  { id: 'session-unmarked', title: '没归档的会话\u200b', archived: false, files: ['session.v4.jsonl.zstd'], expectDeleted: false },
-  { id: 'session-no-log', title: '目录里没有日志\u200b', archived: true, files: ['notes.txt'], expectDeleted: false },
+  { id: 'session-marked', title: '要删的会话\u200c\u200d', archived: true, files: ['session.v4.jsonl.zstd'], expectDeleted: true },
+  { id: 'session-unmarked', title: '没归档的会话\u200c\u200d', archived: false, files: ['session.v4.jsonl.zstd'], expectDeleted: false },
+  { id: 'session-no-log', title: '目录里没有日志\u200c\u200d', archived: true, files: ['notes.txt'], expectDeleted: false },
   { id: 'session-plain-title', title: '标题没记号', archived: true, files: ['session.v4.jsonl.zstd'], expectDeleted: false },
 ]
 
