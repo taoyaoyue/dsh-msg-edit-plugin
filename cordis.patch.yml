@@ -1,0 +1,3 @@
+- insert:
+    - id: msg-edit
+      name: '@local/dsh-msg-edit'

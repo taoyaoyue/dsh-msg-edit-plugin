@@ -1,0 +1,34 @@
+{
+  "name": "@local/dsh-msg-edit",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH 插件：改这一轮的提问并原地重发 / 删掉这一轮及之后的内容",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "conversation"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-chat"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node smoke.mjs . && node purge-smoke.mjs"
+  }
+}
