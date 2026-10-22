@@ -105,6 +105,14 @@ node purge-smoke.mjs    # Host 侧：在临时 DSH_HOME 里造假会话目录，
 2. 删掉 `node_modules/@local/dsh-msg-edit/`；
 3. 重启 DSH。
 
+## 镜像同步（Gitee → GitHub）
+
+- **主仓库在 Gitee**：<https://gitee.com/peach_moon/dsh-msg-edit-plugin>，日常改代码往这里推。
+- **GitHub 是只读镜像**：<https://github.com/taoyaoyue/dsh-msg-edit-plugin>，由 [`.github/workflows/mirror-from-gitee.yml`](.github/workflows/mirror-from-gitee.yml) 每天 UTC 00:00（北京时间 08:00）整份强推过去。
+- 想立刻同步：GitHub 仓库 → **Actions** → 左侧「从 Gitee 镜像同步」→ **Run workflow**。
+- 用的是 Actions 自带的 `GITHUB_TOKEN`，**不需要配任何 Secret**。Gitee 仓库将来要是转私有，再到 GitHub 加 `GITEE_USER` / `GITEE_TOKEN` 两个 Secret 即可（workflow 里已经预留）。
+- **别直接在 GitHub 上改文件** —— 下一次同步会被 Gitee 的内容覆盖。
+
 ## License
 
 MIT，见 [LICENSE](LICENSE)。
